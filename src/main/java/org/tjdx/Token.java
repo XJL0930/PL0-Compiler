@@ -6,6 +6,7 @@ public class Token {
     private int columnNum; //行号和列号，供错误处理定位用
     private String tokenValue;
 
+
     public Token(TokenType tokenType, int lineNum, int columnNum, String tokenValue) {
         this.tokenType = tokenType;
         this.lineNum = lineNum;

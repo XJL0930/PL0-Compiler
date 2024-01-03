@@ -1,17 +1,33 @@
 package org.tjdx;
 
 import java.util.HashMap;
+import java.util.Collections;
+import java.util.Stack;
 
 public class GrammarAnalysis {
+    private int number;// 临时变量标号
     private LexAnalysis lexAnalysis;
     private Token token;    //现在分析的token
+    private int now_pos;//当前处理三地址代码的行数
+    Stack<Integer> stack;//存储处理的三地址代码的行数
+    Stack<Symbol> symbols;
+    public MidCodeSet midCodeSet;
 
     private HashMap<String,Integer> symbolMap;   //0:程序名 1：常量 2：变量
+
+    private enum ExpressionType{
+        assignment,condition,loop,compound
+    }
 
     public GrammarAnalysis(String filePath) {
         this.lexAnalysis = LexAnalysis.getLexAnalysisInstance(filePath);
         this.token = null;
         this.symbolMap = new HashMap<>();
+        this.midCodeSet=new MidCodeSet();
+        this.number=0;
+        this.now_pos=0;
+        stack=new Stack<>();
+        symbols=new Stack<>();
     }
 
     private void readToken(){
@@ -55,7 +71,7 @@ public class GrammarAnalysis {
     private void subProgramAnalysis(){
         constantDescription_optional_Analysis();
         variableDescription_optional_Analysis();
-        statementAnalysis();
+        statementAnalysis(0);
     }
     /**
      * [<常量说明>]--→<常量说明>|ε
@@ -193,18 +209,18 @@ public class GrammarAnalysis {
     /**
      * <语句>--→<赋值语句> | <条件语句 >| <循环语句> | <复合语句> | ε
      * */
-    private void statementAnalysis(){
+    private void statementAnalysis(int layer){
         if (token.getTokenType()==TokenType.ID){
-            assignmentStatementAnalysis();
+            assignmentStatementAnalysis(layer);
         }
         else if(token.getTokenType()==TokenType.IF){
-            conditionStatementAnalysis();
+            conditionStatementAnalysis(layer);
         }
         else if(token.getTokenType()==TokenType.WHILE){
-            loopStatementAnalysis();
+            loopStatementAnalysis(layer);
         }
         else if(token.getTokenType()==TokenType.BEGIN){
-            compoundStatementAnalysis();
+            compoundStatementAnalysis(layer);
         }
         else if(token.getTokenType()==TokenType.EOF||token.getTokenType()==TokenType.SEMI||token.getTokenType()==TokenType.END){
             return;
@@ -216,12 +232,14 @@ public class GrammarAnalysis {
     /**
      * <赋值语句>--→<标识符>:=<表达式>
      * */
-    private void assignmentStatementAnalysis(){
+    private void assignmentStatementAnalysis(int layer){
+        ExpressionType expressionType=ExpressionType.assignment;
         if (token.getTokenType()==TokenType.ID){
             if(!symbolMap.containsKey(token.getTokenValue()) || symbolMap.get(token.getTokenValue())!=2){
                 throw new GrammarException(11, token.getLineNum(),token.getColumnNum());
             }
             else{
+                symbols.push(new Symbol(layer,token.getTokenValue()));
                 readToken();
             }
         }
@@ -229,61 +247,88 @@ public class GrammarAnalysis {
             throw new GrammarException(1, token.getLineNum(),token.getColumnNum());
         }
         if(token.getTokenType()==TokenType.ASSIGN){
+            symbols.push(new Symbol(layer,":="));
             readToken();
         }
         else{
             throw new GrammarException(4, token.getLineNum(),token.getColumnNum());
         }
-        expressionAnalysis();
+//        for (Symbol s : symbols) {
+//            System.out.println(s.getLayer()+" "+s.getSymbol());
+//        }
+//        System.out.println("1111111111111111111111");
+        expressionAnalysis(expressionType,layer+1);
+        MidCode midCode=new MidCode();
+        midCode.setRight(symbols.pop().getSymbol());
+        midCode.setOp(symbols.pop().getSymbol());
+        midCode.setDes(symbols.pop().getSymbol());
+        midCodeSet.add(midCode);
+        symbols.push(new Symbol(layer,"T"+Integer.toString(number++)));
     }
     /**
      * <表达式>--→[+|-]<项> <表达式'>
      * */
-    private void expressionAnalysis(){
+    private void expressionAnalysis(ExpressionType expressionType,int layer){
+        TokenType type=token.getTokenType();
         // [+|-] --→ +|-|ε
-        if (token.getTokenType()==TokenType.PLUS){
+        if (type==TokenType.PLUS){
             readToken();
         }
-        else if(token.getTokenType()==TokenType.SUB){
+        else if(type==TokenType.SUB){
+            if (expressionType==ExpressionType.assignment){
+                symbols.push(new Symbol(layer,"uminus"));
+            }
             readToken();
         }
-        else if(token.getTokenType()==TokenType.ID || token.getTokenType()==TokenType.INT||token.getTokenType()==TokenType.LPAR){
-            if(token.getTokenType()==TokenType.ID && !symbolMap.containsKey(token.getTokenValue())){
+        else if(type==TokenType.ID || type==TokenType.INT||type==TokenType.LPAR){
+            if(type==TokenType.ID && !symbolMap.containsKey(token.getTokenValue())){
                 throw new GrammarException(11, token.getLineNum(),token.getColumnNum());
             }
         }
         else{
             throw new GrammarException(12, token.getLineNum(),token.getColumnNum());
         }
-        itemAnalysis();
-        expression_Analysis();
+        itemAnalysis(expressionType,layer);
+        expression_Analysis(expressionType,layer);
     }
     /**
      * <项> --→ <因⼦> <项'>
      * */
-    private void itemAnalysis(){
-        divisorAnalysis();
-        item_Analysis();
+    private void itemAnalysis(ExpressionType expressionType,int layer){
+        divisorAnalysis(expressionType,layer+1);
+        item_Analysis(expressionType,layer+1);
     }
     /**
      * <因⼦>--→<标识符> |<⽆符号整数> | (<表达式>)
      * */
-    private void divisorAnalysis(){
+    private void divisorAnalysis(ExpressionType expressionType,int layer){
+//        String temp="~";
+        boolean flag=false;
         if(token.getTokenType()==TokenType.ID){
             if(!symbolMap.containsKey(token.getTokenValue())){
                 throw new GrammarException(11, token.getLineNum(),token.getColumnNum());
             }
             else{
+                symbols.push(new Symbol(layer,token.getTokenValue()));
                 readToken();
             }
         }
         else if(token.getTokenType()==TokenType.INT){
+            symbols.push(new Symbol(layer,token.getTokenValue()));
             readToken();
         }
         else if(token.getTokenType()==TokenType.LPAR){
             readToken();
-            expressionAnalysis();
+            expressionAnalysis(expressionType,layer+1);
             if (token.getTokenType()==TokenType.RPAR){
+                MidCode midCode=new MidCode();
+                midCode.setRight(symbols.pop().getSymbol());
+                midCode.setOp(symbols.pop().getSymbol());
+                midCode.setLeft(symbols.pop().getSymbol());
+                String temp="T"+Integer.toString(number++);
+                midCode.setDes(temp);
+                midCodeSet.add(midCode);
+                symbols.push(new Symbol(layer,temp));
                 readToken();
             }
             else{
@@ -297,11 +342,18 @@ public class GrammarAnalysis {
     /**
      *  <项'> → <乘法运算符> <因⼦> <项'> |ε
      * */
-    private void item_Analysis(){
+    private void item_Analysis(ExpressionType expressionType ,int layer){
+
         if(token.getTokenType()==TokenType.MULTI||token.getTokenType()==TokenType.DIV){
+            Statute_Cal(1,layer);
+            if(token.getTokenType()==TokenType.MULTI) {
+                symbols.push(new Symbol(layer,"*"));
+            }else{
+                symbols.push(new Symbol(layer,"/"));
+            }
             readToken();
-            divisorAnalysis();
-            item_Analysis();
+            divisorAnalysis(expressionType,layer);
+            item_Analysis(expressionType,layer);
         }
         else if(token.getTokenType()==TokenType.PLUS||token.getTokenType()==TokenType.SUB||
                 token.getTokenType()==TokenType.THEN||token.getTokenType()==TokenType.DO||
@@ -310,6 +362,8 @@ public class GrammarAnalysis {
                 token.getTokenType()==TokenType.SMALLER||token.getTokenType()==TokenType.SMEQUAL||
                 token.getTokenType()==TokenType.GREATER||token.getTokenType()==TokenType.GREQUAL||
                 token.getTokenType()==TokenType.RPAR){
+                Statute_Cal(1,layer);
+
             return;
         }
         else{
@@ -319,11 +373,17 @@ public class GrammarAnalysis {
     /**
      * <表达式'>--→<加法运算符> <项> <表达式'>|ε
      * */
-    private void expression_Analysis(){
+    private void expression_Analysis(ExpressionType expressionType,int layer){
         if(token.getTokenType()==TokenType.PLUS||token.getTokenType()==TokenType.SUB){
+            Statute_Cal(0,layer);
+            if(token.getTokenType()==TokenType.PLUS) {
+                symbols.push(new Symbol(layer,"+"));
+            }else{
+                symbols.push(new Symbol(layer,"-"));
+            }
             readToken();
-            itemAnalysis();
-            expression_Analysis();
+            itemAnalysis(expressionType,layer);
+            expression_Analysis(expressionType,layer);
         }
         else if (
                 token.getTokenType()==TokenType.THEN||token.getTokenType()==TokenType.DO||
@@ -332,6 +392,8 @@ public class GrammarAnalysis {
                 token.getTokenType()==TokenType.SMALLER||token.getTokenType()==TokenType.SMEQUAL||
                 token.getTokenType()==TokenType.GREATER||token.getTokenType()==TokenType.GREQUAL||
                 token.getTokenType()==TokenType.RPAR){
+
+                Statute_Cal(0,layer);
             return;
         }
         else{
@@ -341,72 +403,198 @@ public class GrammarAnalysis {
     /**
      * <条件语句>--→IF <条件> THEN <语句>
      * */
-    private void conditionStatementAnalysis(){
+    private void conditionStatementAnalysis(int layer){
         if(token.getTokenType()==TokenType.IF){
+            symbols.push(new Symbol(layer,"IF"));
             readToken();
         }
         else{
             throw new GrammarException(17, token.getLineNum(),token.getColumnNum());
         }
-        conditionAnalysis();
+        conditionAnalysis(layer+1);
+
         if(token.getTokenType()==TokenType.THEN){
+            symbols.push(new Symbol(layer,"THEN"));
             readToken();
         }
         else{
             throw new GrammarException(18, token.getLineNum(),token.getColumnNum());
         }
-        statementAnalysis();
+        Symbol m =new Symbol(layer,"M"+number++);
+        m.setQuad(nextquad());
+        symbols.push(m);
+
+        statementAnalysis(layer+1);
+
+        Symbol temp1=symbols.peek();
+        while(temp1.getLayer()!=layer){
+            symbols.pop();
+            temp1=symbols.peek();
+        }
+        String S2="T"+Integer.toString(number++);
+        Symbol s_S2=new Symbol(layer,S2);
+        symbols.push(s_S2);
+
+        for (Symbol s : symbols) {
+            System.out.println(s.getSymbol()+" "+s.getLayer());
+        }
+        System.out.println("-------------------");
+        Symbol s_S1=symbols.pop();
+        Symbol s_M=symbols.pop();
+        Symbol s_then=symbols.pop();
+        Symbol s_E=symbols.pop();
+        Symbol s_IF=symbols.pop();
+//        System.out.println(s_M.getQuad());
+//        System.out.println(s_E.getTrueList());
+        backpatch(s_E.getTrueList(),s_M.getQuad());
+//        backpatch(s_E.getFlaseList(),s_S1.getQuad());
+
+        String S="T"+Integer.toString(number++);
+        Symbol s_S=new Symbol(layer,S);
+        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
+        for(MidCode code : midCodeSet.getAllcode()){
+            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
+        }
+        System.out.println("--------------");
+        System.out.println(s_E.getFlaseList());
+        s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
+        System.out.println(s_S.getNextList());
+        for(MidCode code : midCodeSet.getAllcode()){
+            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
+        }
+        backpatch(s_S.getNextList(),nextquad());
+        symbols.push(s_S);
+//        s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
     }
     /**
      * <条件>→<表达式> <关系运算符> <表达式>
      * */
-    private void conditionAnalysis(){
-        expressionAnalysis();
+    private void conditionAnalysis(int layer){
+        ExpressionType expressionType=ExpressionType.condition;
+        expressionAnalysis(expressionType,layer+1);
+
         if (
             token.getTokenType()==TokenType.EQUAL||token.getTokenType()==TokenType.UNEQUAL||
             token.getTokenType()==TokenType.SMALLER||token.getTokenType()==TokenType.SMEQUAL||
             token.getTokenType()==TokenType.GREATER||token.getTokenType()==TokenType.GREQUAL){
+            symbols.push(new Symbol(layer,getCompareName(token.getTokenType())));
             readToken();
         }
         else{
             throw new GrammarException(19, token.getLineNum(),token.getColumnNum());
         }
-        expressionAnalysis();
+
+//        for (Symbol s : symbols) {
+//            System.out.println(s.getSymbol()+" "+s.getLayer());
+//        }
+//        System.out.println("-------------------");
+
+        expressionAnalysis(expressionType,layer+1);
+
+        Symbol temp1=symbols.pop();
+        Symbol temp2=symbols.pop();
+        Symbol temp3=symbols.pop();
+
+        String t3="T"+Integer.toString(number++);
+        Symbol ms3=new Symbol(layer-1,t3);
+        ms3.setFlaseList(nextquad()+1);
+        ms3.setTrueList(nextquad());
+        symbols.push(ms3);
+
+        MidCode mc3=new MidCode();
+        mc3.setDes("-");
+        mc3.setLeft(temp3.getSymbol());
+        mc3.setRight(temp1.getSymbol());
+        mc3.setOp("j"+temp2.getSymbol());
+        midCodeSet.add(mc3);
+        MidCode mc4=new MidCode();
+        mc4.setDes("-");
+        mc4.setOp("j");
+        midCodeSet.add(mc4);
     }
     /**
      * <循环语句>→WHILE <条件> DO <语句>
      * */
-    private void loopStatementAnalysis(){
+    private void loopStatementAnalysis(int layer){
         if(token.getTokenType()==TokenType.WHILE){
+            symbols.push(new Symbol(layer,"WHILE"));
             readToken();
         }
         else{
             throw new GrammarException(20, token.getLineNum(),token.getColumnNum());
         }
-        conditionAnalysis();
+
+        Symbol m1=new Symbol(layer,"M"+number++);
+        m1.setQuad(nextquad());
+        symbols.push(m1);
+
+        conditionAnalysis(layer+1);
+
         if(token.getTokenType()==TokenType.DO){
+            symbols.push(new Symbol(layer,"DO"));
             readToken();
         }
         else{
             throw new GrammarException(21, token.getLineNum(),token.getColumnNum());
         }
-        statementAnalysis();
+        Symbol m2 =new Symbol(layer,"M"+number++);
+        m2.setQuad(nextquad());
+        symbols.push(m2);
+
+        statementAnalysis(layer+1);
+
+        Symbol temp1=symbols.peek();
+        while(temp1.getLayer()!=layer){
+            symbols.pop();
+            temp1=symbols.peek();
+        }
+        String S2="T"+Integer.toString(number++);
+        Symbol s_S2=new Symbol(layer,S2);
+        s_S2.setQuad(nextquad());
+        s_S2.setNextList(-1);
+        symbols.push(s_S2);
+
+        for (Symbol s : symbols) {
+            System.out.println(s.getSymbol()+" "+s.getLayer()+" "+s.getFlaseList());
+        }
+        for(MidCode code : midCodeSet.getAllcode()){
+            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
+        }
+        System.out.println("1111111111111111-------------------");
+
+        Symbol s_S1=symbols.pop();
+        Symbol s_M2=symbols.pop();
+        Symbol s_DO=symbols.pop();
+        Symbol s_E=symbols.pop();
+        Symbol s_M1=symbols.pop();
+        Symbol s_WHILE=symbols.pop();
+        backpatch(s_S1.getNextList(),s_M1.getQuad());
+        backpatch(s_E.getTrueList(),s_M2.getQuad());
+        String S="T"+Integer.toString(number++);
+        Symbol s_S=new Symbol(layer,S);
+        s_S.setNextList(s_E.getFlaseList());
+        symbols.push(s_S);
+        MidCode midCode=new MidCode();
+        midCode.setOp("j");
+        midCode.setDes(Integer.toString(s_M1.getQuad()));
+        midCodeSet.add(midCode);
+        backpatch(s_S.getNextList(),nextquad());
     }
     /**
      * <复合语句>→BEGIN <语句>{; <语句>} END
      * */
-    private void compoundStatementAnalysis(){
+    private void compoundStatementAnalysis(int layer){
         if(token.getTokenType()==TokenType.BEGIN){
             readToken();
         }
         else{
             throw new GrammarException(22, token.getLineNum(),token.getColumnNum());
         }
-        statementAnalysis();
+        statementAnalysis(layer+1);
         while(true){
             if (token.getTokenType()==TokenType.SEMI){
                 readToken();
-                statementAnalysis();
+                statementAnalysis(layer+1);
             }
             else if(token.getTokenType()==TokenType.END){
                 readToken();
@@ -417,4 +605,128 @@ public class GrammarAnalysis {
             }
         }
     }
+
+    /**
+     * 计算语句规约，1表示乘除，0表示加减
+     * */
+    private void Statute_Cal(int num,int layer){
+//        for (Symbol s : symbols) {
+//            System.out.println(s.getSymbol()+" "+s.getLayer());
+//        }
+//        System.out.println("-------------------");
+        if(symbols.size()>=3){
+            MidCode midCode=new MidCode();
+
+            Symbol temp1=symbols.pop();
+            Symbol temp2=symbols.pop();
+            Symbol temp3=symbols.pop();
+            if(num==0) {
+                if ((temp2.getSymbol().equals("+") || temp2.getSymbol().equals("-"))
+                        && temp3.getLayer() == temp1.getLayer()
+                ) {
+                    midCode.setRight(temp1.getSymbol());
+                    midCode.setOp(temp2.getSymbol());
+                    midCode.setLeft(temp3.getSymbol());
+                    String temp = "T" + Integer.toString(number++);
+                    midCode.setDes(temp);
+                    midCodeSet.add(midCode);
+                    symbols.push(new Symbol(layer, temp));
+                } else {
+                    symbols.push(temp3);
+                    symbols.push(temp2);
+                    symbols.push(temp1);
+                }
+            }else{
+                if ((temp2.getSymbol().equals("*") || temp2.getSymbol().equals("/"))
+                        && temp3.getLayer() == temp1.getLayer()
+                ) {
+                    midCode.setRight(temp1.getSymbol());
+                    midCode.setOp(temp2.getSymbol());
+                    midCode.setLeft(temp3.getSymbol());
+                    String temp = "T" + Integer.toString(number++);
+                    midCode.setDes(temp);
+                    midCodeSet.add(midCode);
+                    symbols.push(new Symbol(layer, temp));
+                } else {
+                    symbols.push(temp3);
+                    symbols.push(temp2);
+                    symbols.push(temp1);
+                }
+            }
+        }
+    }
+
+    /**
+     * 用于布尔语句翻译的生成链表
+     * @param n
+     */
+    private int makeList(int n){
+        midCodeSet.getAllcode().get(n).setDes("-");
+        return n;
+    }
+
+    /**
+     * 用于布尔语句翻译的生成合并
+     */
+    private int merge(int n1,int n2){
+        MidCode m=midCodeSet.getAllcode().get(n1);
+        String temp=m.getDes();
+        while(temp!="-"){
+            m=midCodeSet.getAllcode().get(Integer.parseInt(temp));
+            temp=m.getDes();
+        }
+        if(n2!=-1)
+            m.setDes(Integer.toString(n2));
+        return n1;
+    }
+
+    /**
+     * 返回下一条将要生成的三地址代码地址
+     * @return
+     */
+    private int nextquad(){
+        return midCodeSet.getAddress()+1;
+    }
+
+    /**
+     * 回填函数，将以p为表头的链表都回填为t
+     * @param p
+     * @param t
+     */
+    private void backpatch(int p,int t){
+        if(p!=-1) {
+            MidCode m = midCodeSet.getAllcode().get(p);
+            String temp = m.getDes();
+            m.setDes(Integer.toString(t));
+            while (temp != "-") {
+                m = midCodeSet.getAllcode().get(Integer.parseInt(temp));
+                temp = m.getDes();
+                m.setDes(Integer.toString(t));
+            }
+        }
+    }
+
+    /**
+     * 得到比价运算符的符号
+     * @param t
+     * @return
+     */
+    private String getCompareName(TokenType t){
+        switch(t){
+            case EQUAL:
+                return "=";
+            case UNEQUAL:
+                return "!=";
+            case SMALLER:
+                return "<";
+            case SMEQUAL:
+                return "<=";
+            case GREATER:
+                return ">";
+            case GREQUAL:
+                return ">=";
+        }
+        return "error";
+    }
+
 }

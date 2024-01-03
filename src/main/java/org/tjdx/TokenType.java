@@ -7,4 +7,5 @@ public enum TokenType {
     ASSIGN,   //赋值符
     EQUAL,UNEQUAL,GREATER,GREQUAL,SMALLER,SMEQUAL,    //比较符
     LPAR,RPAR,SEMI,COMMA    //界符
+
 }
