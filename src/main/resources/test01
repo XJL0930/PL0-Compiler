@@ -11,7 +11,7 @@ BEGIN
     WHILE x >= 1
         DO
             BEGIN
-                y := (x+y-1)*3-6/(1+2);
+                y := (x+y-1)*3-6/(-1+2);
                 ;;
             END
 
