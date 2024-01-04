@@ -1,23 +1,20 @@
 package org.tjdx;
 
 import java.util.HashMap;
-import java.util.Collections;
 import java.util.Stack;
 
 public class GrammarAnalysis {
     private int number;// 临时变量标号
     private LexAnalysis lexAnalysis;
     private Token token;    //现在分析的token
-    private int now_pos;//当前处理三地址代码的行数
-    Stack<Integer> stack;//存储处理的三地址代码的行数
-    Stack<Symbol> symbols;
-    public MidCodeSet midCodeSet;
+    Stack<Symbol> symbols; //建立一个符号栈，方便对表达式进行规约
+    public MidCodeSet midCodeSet; //中间代码集
 
     private HashMap<String,Integer> symbolMap;   //0:程序名 1：常量 2：变量
 
     private enum ExpressionType{
         assignment,condition,loop,compound
-    }
+    } // 枚举类，表示表达式类型
 
     public GrammarAnalysis(String filePath) {
         this.lexAnalysis = LexAnalysis.getLexAnalysisInstance(filePath);
@@ -25,8 +22,6 @@ public class GrammarAnalysis {
         this.symbolMap = new HashMap<>();
         this.midCodeSet=new MidCodeSet();
         this.number=0;
-        this.now_pos=0;
-        stack=new Stack<>();
         symbols=new Stack<>();
     }
 
@@ -253,22 +248,19 @@ public class GrammarAnalysis {
         else{
             throw new GrammarException(4, token.getLineNum(),token.getColumnNum());
         }
-//        for (Symbol s : symbols) {
-//            System.out.println(s.getLayer()+" "+s.getSymbol());
-//        }
-//        System.out.println("1111111111111111111111");
+
         expressionAnalysis(expressionType,layer+1);
-        MidCode midCode=new MidCode();
-        midCode.setRight(symbols.pop().getSymbol());
-        midCode.setOp(symbols.pop().getSymbol());
-        midCode.setDes(symbols.pop().getSymbol());
-        midCodeSet.add(midCode);
-        symbols.push(new Symbol(layer,"T"+Integer.toString(number++)));
+
+        /**
+         * 进行赋值语句的规约，生成中间代码
+         */
+        StatuteAssign(layer);
     }
     /**
      * <表达式>--→[+|-]<项> <表达式'>
      * */
     private void expressionAnalysis(ExpressionType expressionType,int layer){
+        boolean flag=false;
         TokenType type=token.getTokenType();
         // [+|-] --→ +|-|ε
         if (type==TokenType.PLUS){
@@ -277,6 +269,7 @@ public class GrammarAnalysis {
         else if(type==TokenType.SUB){
             if (expressionType==ExpressionType.assignment){
                 symbols.push(new Symbol(layer,"uminus"));
+                flag=true;
             }
             readToken();
         }
@@ -289,7 +282,16 @@ public class GrammarAnalysis {
             throw new GrammarException(12, token.getLineNum(),token.getColumnNum());
         }
         itemAnalysis(expressionType,layer);
+
+        /**
+         * 对取负数操作进行特殊处理，在处理+、-之前对其进行规约和生成中间代码
+         */
+        if(flag){
+            StatuteUminus(layer);
+        }
+
         expression_Analysis(expressionType,layer);
+
     }
     /**
      * <项> --→ <因⼦> <项'>
@@ -318,17 +320,19 @@ public class GrammarAnalysis {
             readToken();
         }
         else if(token.getTokenType()==TokenType.LPAR){
+            symbols.push(new Symbol(layer,"("));
+
             readToken();
+
             expressionAnalysis(expressionType,layer+1);
+
             if (token.getTokenType()==TokenType.RPAR){
-                MidCode midCode=new MidCode();
-                midCode.setRight(symbols.pop().getSymbol());
-                midCode.setOp(symbols.pop().getSymbol());
-                midCode.setLeft(symbols.pop().getSymbol());
-                String temp="T"+Integer.toString(number++);
-                midCode.setDes(temp);
-                midCodeSet.add(midCode);
-                symbols.push(new Symbol(layer,temp));
+
+                /**
+                 * 对括号表达式进行规约和中间代码生成，分括号内有无运算符号两种情况讨论
+                 */
+                StatutePar(layer);
+
                 readToken();
             }
             else{
@@ -345,7 +349,7 @@ public class GrammarAnalysis {
     private void item_Analysis(ExpressionType expressionType ,int layer){
 
         if(token.getTokenType()==TokenType.MULTI||token.getTokenType()==TokenType.DIV){
-            Statute_Cal(1,layer);
+            StatuteCal(1,layer);
             if(token.getTokenType()==TokenType.MULTI) {
                 symbols.push(new Symbol(layer,"*"));
             }else{
@@ -362,7 +366,10 @@ public class GrammarAnalysis {
                 token.getTokenType()==TokenType.SMALLER||token.getTokenType()==TokenType.SMEQUAL||
                 token.getTokenType()==TokenType.GREATER||token.getTokenType()==TokenType.GREQUAL||
                 token.getTokenType()==TokenType.RPAR){
-                Statute_Cal(1,layer);
+                /**
+                 * 对乘除表达式进行规约和中间代码生成
+                 */
+                StatuteCal(1,layer);
 
             return;
         }
@@ -375,7 +382,7 @@ public class GrammarAnalysis {
      * */
     private void expression_Analysis(ExpressionType expressionType,int layer){
         if(token.getTokenType()==TokenType.PLUS||token.getTokenType()==TokenType.SUB){
-            Statute_Cal(0,layer);
+            StatuteCal(0,layer);
             if(token.getTokenType()==TokenType.PLUS) {
                 symbols.push(new Symbol(layer,"+"));
             }else{
@@ -392,8 +399,10 @@ public class GrammarAnalysis {
                 token.getTokenType()==TokenType.SMALLER||token.getTokenType()==TokenType.SMEQUAL||
                 token.getTokenType()==TokenType.GREATER||token.getTokenType()==TokenType.GREQUAL||
                 token.getTokenType()==TokenType.RPAR){
-
-                Statute_Cal(0,layer);
+                /**
+                 * 对加减表达式进行规约和中间代码生成
+                 */
+                StatuteCal(0,layer);
             return;
         }
         else{
@@ -426,45 +435,10 @@ public class GrammarAnalysis {
 
         statementAnalysis(layer+1);
 
-        Symbol temp1=symbols.peek();
-        while(temp1.getLayer()!=layer){
-            symbols.pop();
-            temp1=symbols.peek();
-        }
-        String S2="T"+Integer.toString(number++);
-        Symbol s_S2=new Symbol(layer,S2);
-        symbols.push(s_S2);
-
-        for (Symbol s : symbols) {
-            System.out.println(s.getSymbol()+" "+s.getLayer());
-        }
-        System.out.println("-------------------");
-        Symbol s_S1=symbols.pop();
-        Symbol s_M=symbols.pop();
-        Symbol s_then=symbols.pop();
-        Symbol s_E=symbols.pop();
-        Symbol s_IF=symbols.pop();
-//        System.out.println(s_M.getQuad());
-//        System.out.println(s_E.getTrueList());
-        backpatch(s_E.getTrueList(),s_M.getQuad());
-//        backpatch(s_E.getFlaseList(),s_S1.getQuad());
-
-        String S="T"+Integer.toString(number++);
-        Symbol s_S=new Symbol(layer,S);
-        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
-        for(MidCode code : midCodeSet.getAllcode()){
-            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
-        }
-        System.out.println("--------------");
-        System.out.println(s_E.getFlaseList());
-        s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
-        System.out.println(s_S.getNextList());
-        for(MidCode code : midCodeSet.getAllcode()){
-            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
-        }
-        backpatch(s_S.getNextList(),nextquad());
-        symbols.push(s_S);
-//        s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
+        /**
+         * 对条件语句进行规约和中间代码生成
+         */
+        StatuteCon(layer);
     }
     /**
      * <条件>→<表达式> <关系运算符> <表达式>
@@ -491,26 +465,11 @@ public class GrammarAnalysis {
 
         expressionAnalysis(expressionType,layer+1);
 
-        Symbol temp1=symbols.pop();
-        Symbol temp2=symbols.pop();
-        Symbol temp3=symbols.pop();
+        /**
+         * 对条件表达式进行处理
+         */
+        StatuteBool(layer);
 
-        String t3="T"+Integer.toString(number++);
-        Symbol ms3=new Symbol(layer-1,t3);
-        ms3.setFlaseList(nextquad()+1);
-        ms3.setTrueList(nextquad());
-        symbols.push(ms3);
-
-        MidCode mc3=new MidCode();
-        mc3.setDes("-");
-        mc3.setLeft(temp3.getSymbol());
-        mc3.setRight(temp1.getSymbol());
-        mc3.setOp("j"+temp2.getSymbol());
-        midCodeSet.add(mc3);
-        MidCode mc4=new MidCode();
-        mc4.setDes("-");
-        mc4.setOp("j");
-        midCodeSet.add(mc4);
     }
     /**
      * <循环语句>→WHILE <条件> DO <语句>
@@ -543,42 +502,10 @@ public class GrammarAnalysis {
 
         statementAnalysis(layer+1);
 
-        Symbol temp1=symbols.peek();
-        while(temp1.getLayer()!=layer){
-            symbols.pop();
-            temp1=symbols.peek();
-        }
-        String S2="T"+Integer.toString(number++);
-        Symbol s_S2=new Symbol(layer,S2);
-        s_S2.setQuad(nextquad());
-        s_S2.setNextList(-1);
-        symbols.push(s_S2);
-
-        for (Symbol s : symbols) {
-            System.out.println(s.getSymbol()+" "+s.getLayer()+" "+s.getFlaseList());
-        }
-        for(MidCode code : midCodeSet.getAllcode()){
-            System.out.println(code.getDes()+"  "+code.getLeft()+"  "+code.getOp()+"  "+code.getRight());
-        }
-        System.out.println("1111111111111111-------------------");
-
-        Symbol s_S1=symbols.pop();
-        Symbol s_M2=symbols.pop();
-        Symbol s_DO=symbols.pop();
-        Symbol s_E=symbols.pop();
-        Symbol s_M1=symbols.pop();
-        Symbol s_WHILE=symbols.pop();
-        backpatch(s_S1.getNextList(),s_M1.getQuad());
-        backpatch(s_E.getTrueList(),s_M2.getQuad());
-        String S="T"+Integer.toString(number++);
-        Symbol s_S=new Symbol(layer,S);
-        s_S.setNextList(s_E.getFlaseList());
-        symbols.push(s_S);
-        MidCode midCode=new MidCode();
-        midCode.setOp("j");
-        midCode.setDes(Integer.toString(s_M1.getQuad()));
-        midCodeSet.add(midCode);
-        backpatch(s_S.getNextList(),nextquad());
+        /**
+         * 对循环语句进行规约和中间代码生成
+         */
+        StatuteLoop(layer);
     }
     /**
      * <复合语句>→BEGIN <语句>{; <语句>} END
@@ -606,10 +533,14 @@ public class GrammarAnalysis {
         }
     }
 
+    /** ---------------------------------------------------------------------- **/
+    /** 以下为语义分析及中间代码生成函数 */
+    /** ---------------------------------------------------------------------- **/
+
     /**
      * 计算语句规约，1表示乘除，0表示加减
      * */
-    private void Statute_Cal(int num,int layer){
+    private void StatuteCal(int num, int layer){
 //        for (Symbol s : symbols) {
 //            System.out.println(s.getSymbol()+" "+s.getLayer());
 //        }
@@ -656,6 +587,154 @@ public class GrammarAnalysis {
         }
     }
 
+    /**
+     * 对布尔表达式进行规约和中间代码生成
+     * @param layer
+     */
+    private void StatuteBool(int layer){
+        Symbol temp1=symbols.pop();
+        Symbol temp2=symbols.pop();
+        Symbol temp3=symbols.pop();
+
+        String t3="T"+Integer.toString(number++);
+        Symbol ms3=new Symbol(layer-1,t3);
+        ms3.setFlaseList(nextquad()+1);
+        ms3.setTrueList(nextquad());
+        symbols.push(ms3);
+
+        MidCode mc3=new MidCode();
+        mc3.setDes("-");
+        mc3.setLeft(temp3.getSymbol());
+        mc3.setRight(temp1.getSymbol());
+        mc3.setOp("j"+temp2.getSymbol());
+        midCodeSet.add(mc3);
+        MidCode mc4=new MidCode();
+        mc4.setDes("-");
+        mc4.setOp("j");
+        midCodeSet.add(mc4);
+    }
+
+    /**
+     * 对条件语句进行规约和中间代码生成
+     * @param layer
+     */
+    private void StatuteCon(int layer){
+        Symbol temp1=symbols.peek();
+        while(temp1.getLayer()!=layer){
+            symbols.pop();
+            temp1=symbols.peek();
+        }
+        String S2="T"+Integer.toString(number++);
+        Symbol s_S2=new Symbol(layer,S2);
+        symbols.push(s_S2);
+
+//        for (Symbol s : symbols) {
+//            System.out.println(s.getSymbol()+" "+s.getLayer());
+//        }
+//        System.out.println("-------------------");
+        Symbol s_S1=symbols.pop();
+        Symbol s_M=symbols.pop();
+        Symbol s_then=symbols.pop();
+        Symbol s_E=symbols.pop();
+        Symbol s_IF=symbols.pop();
+        backpatch(s_E.getTrueList(),s_M.getQuad());
+
+        String S="T"+Integer.toString(number++);
+        Symbol s_S=new Symbol(layer,S);
+        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
+        System.out.println(s_E.getFlaseList());
+        s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
+        System.out.println(s_S.getNextList());
+        backpatch(s_S.getNextList(),nextquad());
+        symbols.push(s_S);
+    }
+    /**
+     * 对循环语句进行规约和中间代码生成
+     * @param layer
+     */
+    private void StatuteLoop(int layer){
+        Symbol temp1=symbols.peek();
+        while(temp1.getLayer()!=layer){
+            symbols.pop();
+            temp1=symbols.peek();
+        }
+        String S2="T"+Integer.toString(number++);
+        Symbol s_S2=new Symbol(layer,S2);
+        s_S2.setQuad(nextquad());
+        s_S2.setNextList(-1);
+        symbols.push(s_S2);
+
+        Symbol s_S1=symbols.pop();
+        Symbol s_M2=symbols.pop();
+        Symbol s_DO=symbols.pop();
+        Symbol s_E=symbols.pop();
+        Symbol s_M1=symbols.pop();
+        Symbol s_WHILE=symbols.pop();
+        backpatch(s_S1.getNextList(),s_M1.getQuad());
+        backpatch(s_E.getTrueList(),s_M2.getQuad());
+        String S="T"+Integer.toString(number++);
+        Symbol s_S=new Symbol(layer,S);
+        s_S.setNextList(s_E.getFlaseList());
+        symbols.push(s_S);
+        MidCode midCode=new MidCode();
+        midCode.setOp("j");
+        midCode.setDes(Integer.toString(s_M1.getQuad()));
+        midCodeSet.add(midCode);
+        backpatch(s_S.getNextList(),nextquad());
+    }
+
+    /**
+     * 对赋值语句进行规约和中间代码生成
+     * @param layer
+     */
+    private void StatuteAssign(int layer){
+        MidCode midCode=new MidCode();
+        midCode.setRight(symbols.pop().getSymbol());
+        midCode.setOp(symbols.pop().getSymbol());
+        midCode.setDes(symbols.pop().getSymbol());
+        midCodeSet.add(midCode);
+        symbols.push(new Symbol(layer,"T"+Integer.toString(number++)));
+    }
+
+    /**
+     * 对数值取相反数表达式进行处理
+     * @param layer
+     */
+    private void StatuteUminus(int layer){
+        Symbol temp1=symbols.pop();
+        Symbol temp2=symbols.pop();
+        String temp="T"+Integer.toString(number++);
+        MidCode midCode=new MidCode();
+        midCode.setDes(temp);
+        midCode.setOp("uminus");
+        midCode.setRight(temp1.getSymbol());
+        midCodeSet.add(midCode);
+        symbols.push(new Symbol(layer,temp));
+    }
+
+    /**
+     * 对括号表达式进行处理
+     * @param layer
+     */
+    private void StatutePar(int layer){
+        Symbol temp1=symbols.pop();
+        Symbol temp2=symbols.pop();
+        MidCode midCode=new MidCode();
+        String temp="T"+Integer.toString(number++);
+        midCode.setDes(temp);
+        if(temp2.getSymbol().equals("(")){
+            midCode.setOp(":=");
+            midCode.setRight(temp1.getSymbol());
+        }else{
+            Symbol temp3=symbols.pop();
+            symbols.pop();
+            midCode.setRight(temp1.getSymbol());
+            midCode.setOp(temp2.getSymbol());
+            midCode.setLeft(temp3.getSymbol());
+        }
+        midCodeSet.add(midCode);
+        symbols.push(new Symbol(layer,temp));
+    }
     /**
      * 用于布尔语句翻译的生成链表
      * @param n

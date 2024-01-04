@@ -2,6 +2,7 @@ PROGRAM add
 CONST z := 1,WH := 2;
 VAR x,y;
 BEGIN
-     WHILE x<>y DO y := 3*(x+y)/2;
+     WHILE x<5 DO x:=x+1;
+
 
 END
