@@ -381,18 +381,30 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
     @Override
     public Void visitIdentifier(PL0Compiler.PL0Parser.IdentifierContext ctx) {
         symbols.push(new Symbol(ctx.depth(),ctx.getText()));
-        int parentType = ctx.getParent().getRuleIndex();
+
+        // 获取标识符名称
         String name = ctx.getText();
+        // 获取词法单元的开始位置信息
+        Token startToken = ctx.getStart();
+        int line = startToken.getLine();
+        int charPositionInLine = startToken.getCharPositionInLine();
+        charPositionInLine += name.length();
+
+        // 获取父节点类型
+        int parentType = ctx.getParent().getRuleIndex();
         if (parentType == 4 || parentType == 5) {
+            // 常量定义/变量说明
+            if (names.contains(name)) {
+                // 标识符重复声明
+                System.err.println("line "+line+":"+charPositionInLine+" "+"\""+name+"\""+" already defined");
+                throw new ParseCancellationException("Syntax error detected.");
+            }
             names.add(name);
         } else if (parentType != 1) {
+            // 使用变量/常量
             if (!names.contains(name)) {
-                // 获取词法单元的开始位置信息
-                Token startToken = ctx.getStart();
-                int line = startToken.getLine();
-                int charPositionInLine = startToken.getCharPositionInLine();
-                charPositionInLine += name.length();
-                System.err.println("line "+line+":"+charPositionInLine+" "+"\""+name+"\""+"not defined");
+                // 使用了未定义的变量/常量
+                System.err.println("line "+line+":"+charPositionInLine+" "+"\""+name+"\""+" not defined");
                 throw new ParseCancellationException("Syntax error detected.");
             }
         }
