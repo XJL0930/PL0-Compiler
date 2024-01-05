@@ -238,27 +238,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
         Symbol s_M1=symbols.pop();
 //        Symbol s_WHILE=symbols.pop();
         backpatch(s_S1.getNextList(),s_M1.getQuad());
-        System.out.println("***********");
-        System.out.println(s_E.getTrueList());
-
-        for(int i=0;i<midCodeSet.getAllcode().size();++i){
-            MidCode code=midCodeSet.getAllcode().get(i);
-            if(!code.getOp().equals(":=")&& !code.getOp().contains("j")) {
-                System.out.println(i + 100 + "  " + code.getDes() + " := " + code.getLeft() + "  " + code.getOp() + "  " + code.getRight());
-            } else if (code.getOp().contains("j")) {
-                System.out.println(i+100+"  "+code.getOp()+"  "+code.getLeft()+"  "+code.getRight()+"  "+code.getDes());
-            } else{
-                String des= code.getDes();
-                String src="";
-                if(!code.getLeft().equals("~")){
-                    src=code.getLeft();
-                }else{
-                    src=code.getRight();
-                }
-                System.out.println(i+100+"  "+des+" := "+src);
-            }
-        }
-        System.out.println("***********");
         backpatch(s_E.getTrueList(),s_M2.getQuad());
         String S="T"+Integer.toString(number++);
         Symbol s_S=new Symbol(layer,S);
@@ -288,11 +267,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      * 进行语句规约类型的选择
      */
     private void statutePick(){
-        for(Symbol s:symbols){
-            System.out.println(s.getSymbol()+" "+s.getLayer());
-        }
-        System.out.println(statuteTypes.peek().getType());
-        System.out.println("-----------------------");
         StatuteType statuteType=statuteTypes.pop();
         int depth=statuteType.getDepth();
         switch (statuteType.getType()){

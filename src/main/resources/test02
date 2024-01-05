@@ -1,6 +1,6 @@
 PROGRAM add
 CONST z := 1,WH := 2;
-VAR x,y;
+VAR x,y,z;
 BEGIN
 WHILE x >= 1
         DO
