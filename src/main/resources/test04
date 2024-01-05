@@ -1,10 +1,7 @@
 PROGRAM nestedTest
-CONST x := 5, y := 10, z := 15;
+CONST x := 1,y := 2,z:=3;
 VAR a, b, c;
 BEGIN
-    a := x;
-    b := y;
-    c := z;
 
     IF a < b THEN
         WHILE c > x DO

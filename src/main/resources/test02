@@ -2,7 +2,8 @@ PROGRAM add
 CONST z := 1,WH := 2;
 VAR x,y;
 BEGIN
-     WHILE x<5 DO x:=x+1;
+y:=y+x;
+
 
 
 END

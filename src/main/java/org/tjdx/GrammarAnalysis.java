@@ -638,13 +638,10 @@ public class GrammarAnalysis {
         Symbol s_E=symbols.pop();
         Symbol s_IF=symbols.pop();
         backpatch(s_E.getTrueList(),s_M.getQuad());
-
         String S="T"+Integer.toString(number++);
         Symbol s_S=new Symbol(layer,S);
-        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
-        System.out.println(s_E.getFlaseList());
         s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
-        System.out.println(s_S.getNextList());
+
         backpatch(s_S.getNextList(),nextquad());
         symbols.push(s_S);
     }
@@ -786,7 +783,7 @@ public class GrammarAnalysis {
     }
 
     /**
-     * 得到比价运算符的符号
+     * 得到比较运算符的符号
      * @param t
      * @return
      */

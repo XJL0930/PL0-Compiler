@@ -27,55 +27,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
         statuteTypes =new Stack<>();
         names =new ArrayList<>();
     }
-    /**
-     * 计算语句规约，1表示乘除，0表示加减
-     * */
-    private void Statute_Cal(int num,int layer){
-//        for (Symbol s : symbols) {
-//            System.out.println(s.getSymbol()+" "+s.getLayer());
-//        }
-//        System.out.println("-------------------");
-        if(symbols.size()>=3){
-            MidCode midCode=new MidCode();
-
-            Symbol temp1=symbols.pop();
-            Symbol temp2=symbols.pop();
-            Symbol temp3=symbols.pop();
-            if(num==0) {
-                if ((temp2.getSymbol().equals("+") || temp2.getSymbol().equals("-"))
-                        && temp3.getLayer() == temp1.getLayer()
-                ) {
-                    midCode.setRight(temp1.getSymbol());
-                    midCode.setOp(temp2.getSymbol());
-                    midCode.setLeft(temp3.getSymbol());
-                    String temp = "T" + Integer.toString(number++);
-                    midCode.setDes(temp);
-                    midCodeSet.add(midCode);
-                    symbols.push(new Symbol(layer, temp));
-                } else {
-                    symbols.push(temp3);
-                    symbols.push(temp2);
-                    symbols.push(temp1);
-                }
-            }else{
-                if ((temp2.getSymbol().equals("*") || temp2.getSymbol().equals("/"))
-                        && temp3.getLayer() == temp1.getLayer()
-                ) {
-                    midCode.setRight(temp1.getSymbol());
-                    midCode.setOp(temp2.getSymbol());
-                    midCode.setLeft(temp3.getSymbol());
-                    String temp = "T" + Integer.toString(number++);
-                    midCode.setDes(temp);
-                    midCodeSet.add(midCode);
-                    symbols.push(new Symbol(layer, temp));
-                } else {
-                    symbols.push(temp3);
-                    symbols.push(temp2);
-                    symbols.push(temp1);
-                }
-            }
-        }
-    }
 
     /**
      * 用于布尔语句翻译的生成链表
@@ -119,7 +70,7 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
             MidCode m = midCodeSet.getAllcode().get(p);
             String temp = m.getDes();
             m.setDes(Integer.toString(t));
-            while (temp != "-") {
+            while (temp != "-" && Integer.parseInt(temp)<=midCodeSet.getAddress()) {
                 m = midCodeSet.getAllcode().get(Integer.parseInt(temp));
                 temp = m.getDes();
                 m.setDes(Integer.toString(t));
@@ -244,20 +195,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      */
     private void statueTHEN(StatuteType statuteType){
         int depth=statuteType.getDepth();
-
-//        Symbol temp1=symbols.peek();
-//        while(temp1.getLayer()!=depth){
-//            symbols.pop();
-//            temp1=symbols.peek();
+//        for(Symbol t:symbols){
+//            System.out.println(t.getSymbol()+" "+t.getLayer());
 //        }
-//        String S2="T"+Integer.toString(number++);
-//        Symbol s_S2=new Symbol(depth,S2);
-//        symbols.push(s_S2);
-
-//        for (Symbol s : symbols) {
-//            System.out.println(s.getSymbol()+" "+s.getLayer());
-//        }
-//        System.out.println("-------------------");
         Symbol s_S1=symbols.pop();
         Symbol s_M=symbols.pop();
 //        StatuteType s_then=statuteTypes.pop();
@@ -266,11 +206,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
         backpatch(s_E.getTrueList(),s_M.getQuad());
 
         String S="T"+Integer.toString(number++);
-        Symbol s_S=new Symbol(depth,S);
+        Symbol s_S=new Symbol(s_E.getLayer(),S);
 //        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
-//        System.out.println(s_E.getFlaseList());
         s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
-//        System.out.println(s_S.getNextList());
         backpatch(s_S.getNextList(),nextquad());
         symbols.push(s_S);
     }
@@ -281,6 +219,17 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      */
     private void statueDO(StatuteType statuteType){
         int layer=statuteType.getDepth();
+        Symbol temp1=symbols.peek();
+        while(temp1.getLayer()!=layer){
+            symbols.pop();
+            temp1=symbols.peek();
+        }
+        String S2="T"+Integer.toString(number++);
+        Symbol s_S2=new Symbol(layer,S2);
+        s_S2.setQuad(nextquad());
+        s_S2.setNextList(-1);
+        symbols.push(s_S2);
+
         Symbol s_S1=symbols.pop();
         Symbol s_M2=symbols.pop();
 //        Symbol s_DO=symbols.pop();
@@ -288,6 +237,7 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
         Symbol s_M1=symbols.pop();
 //        Symbol s_WHILE=symbols.pop();
         backpatch(s_S1.getNextList(),s_M1.getQuad());
+
         backpatch(s_E.getTrueList(),s_M2.getQuad());
         String S="T"+Integer.toString(number++);
         Symbol s_S=new Symbol(layer,S);
@@ -305,11 +255,7 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      * 进行语句规约类型的选择
      */
     private void statutePick(){
-        for(Symbol t:symbols){
-//            System.out.println(t.getSymbol()+" "+t.getLayer());
-        }
-//        System.out.println(statuteTypes.peek().getType());
-//        System.out.println("---------------------");
+
         StatuteType statuteType=statuteTypes.pop();
         int depth=statuteType.getDepth();
         switch (statuteType.getType()){
@@ -422,6 +368,7 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
     @Override
     public Void visitStatement(PL0Compiler.PL0Parser.StatementContext ctx) {
         visitChildren(ctx);
+//        statutePick();
         return null;
     }
 

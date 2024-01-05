@@ -11,7 +11,7 @@ public class TestLex {
 //            }
 //            System.out.println(token.toString());
 //        }
-        GrammarAnalysis grammarAnalysis = new GrammarAnalysis("E:\\program\\PL0-Compiler\\src\\main\\resources\\test04");
+        GrammarAnalysis grammarAnalysis = new GrammarAnalysis("D:\\2023 Fall\\CompileFundamention\\PL0-Compiler\\src\\main\\resources\\test04");
         grammarAnalysis.startAnalysis();
         System.out.println(grammarAnalysis.midCodeSet.getAllcode().size());
         for(int i=0;i<grammarAnalysis.midCodeSet.getAllcode().size();++i){

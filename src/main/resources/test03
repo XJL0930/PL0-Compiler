@@ -1,8 +1,6 @@
 PROGRAM factorial
 VAR result, n;
 BEGIN
-    n := 5;
-    result := 1;
 
     WHILE n > 0 DO
     BEGIN
