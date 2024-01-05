@@ -195,9 +195,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      */
     private void statueTHEN(StatuteType statuteType){
         int depth=statuteType.getDepth();
-//        for(Symbol t:symbols){
-//            System.out.println(t.getSymbol()+" "+t.getLayer());
-//        }
         Symbol s_S1=symbols.pop();
         Symbol s_M=symbols.pop();
 //        StatuteType s_then=statuteTypes.pop();
@@ -219,16 +216,20 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      */
     private void statueDO(StatuteType statuteType){
         int layer=statuteType.getDepth();
+        boolean flag=false;
         Symbol temp1=symbols.peek();
         while(temp1.getLayer()!=layer){
             symbols.pop();
             temp1=symbols.peek();
+            flag=true;
         }
-        String S2="T"+Integer.toString(number++);
-        Symbol s_S2=new Symbol(layer,S2);
-        s_S2.setQuad(nextquad());
-        s_S2.setNextList(-1);
-        symbols.push(s_S2);
+        if(flag) {
+            String S2 = "T" + Integer.toString(number++);
+            Symbol s_S2 = new Symbol(layer, S2);
+            s_S2.setQuad(nextquad());
+            s_S2.setNextList(-1);
+            symbols.push(s_S2);
+        }
 
         Symbol s_S1=symbols.pop();
         Symbol s_M2=symbols.pop();
@@ -237,7 +238,27 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
         Symbol s_M1=symbols.pop();
 //        Symbol s_WHILE=symbols.pop();
         backpatch(s_S1.getNextList(),s_M1.getQuad());
+        System.out.println("***********");
+        System.out.println(s_E.getTrueList());
 
+        for(int i=0;i<midCodeSet.getAllcode().size();++i){
+            MidCode code=midCodeSet.getAllcode().get(i);
+            if(!code.getOp().equals(":=")&& !code.getOp().contains("j")) {
+                System.out.println(i + 100 + "  " + code.getDes() + " := " + code.getLeft() + "  " + code.getOp() + "  " + code.getRight());
+            } else if (code.getOp().contains("j")) {
+                System.out.println(i+100+"  "+code.getOp()+"  "+code.getLeft()+"  "+code.getRight()+"  "+code.getDes());
+            } else{
+                String des= code.getDes();
+                String src="";
+                if(!code.getLeft().equals("~")){
+                    src=code.getLeft();
+                }else{
+                    src=code.getRight();
+                }
+                System.out.println(i+100+"  "+des+" := "+src);
+            }
+        }
+        System.out.println("***********");
         backpatch(s_E.getTrueList(),s_M2.getQuad());
         String S="T"+Integer.toString(number++);
         Symbol s_S=new Symbol(layer,S);
@@ -251,11 +272,27 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     }
 
+    private void StatuteUminus(StatuteType statuteType){
+        int layer=statuteType.getDepth();
+        Symbol temp1=symbols.pop();
+        String temp="T"+Integer.toString(number++);
+        MidCode midCode=new MidCode();
+        midCode.setDes(temp);
+        midCode.setOp("uminus");
+        midCode.setRight(temp1.getSymbol());
+        midCodeSet.add(midCode);
+        symbols.push(new Symbol(layer,temp));
+    }
+
     /**
      * 进行语句规约类型的选择
      */
     private void statutePick(){
-
+        for(Symbol s:symbols){
+            System.out.println(s.getSymbol()+" "+s.getLayer());
+        }
+        System.out.println(statuteTypes.peek().getType());
+        System.out.println("-----------------------");
         StatuteType statuteType=statuteTypes.pop();
         int depth=statuteType.getDepth();
         switch (statuteType.getType()){
@@ -285,6 +322,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
                 break;
             case "DO":
                 statueDO(statuteType);
+                break;
+            case "uminus":
+                StatuteUminus(statuteType);
                 break;
         }
     }
@@ -419,6 +459,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
     @Override
     public Void visitExpression(PL0Compiler.PL0Parser.ExpressionContext ctx) {
         visitChildren(ctx);
+        if(ctx.expression()==null && ctx.term()!=null && ctx.getText().startsWith("-")){
+            statuteTypes.push(new StatuteType("uminus", ctx.depth()));
+        }
         statutePick();
         return null;
     }

@@ -628,10 +628,6 @@ public class GrammarAnalysis {
         Symbol s_S2=new Symbol(layer,S2);
         symbols.push(s_S2);
 
-//        for (Symbol s : symbols) {
-//            System.out.println(s.getSymbol()+" "+s.getLayer());
-//        }
-//        System.out.println("-------------------");
         Symbol s_S1=symbols.pop();
         Symbol s_M=symbols.pop();
         Symbol s_then=symbols.pop();
