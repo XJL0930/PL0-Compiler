@@ -1,0 +1,12 @@
+PROGRAM factorial
+VAR result, n;
+BEGIN
+    n := 5;
+    result := 1;
+
+    WHILE n > 0 DO
+    BEGIN
+        result := result * n;
+        n := n - 1;
+    END
+END

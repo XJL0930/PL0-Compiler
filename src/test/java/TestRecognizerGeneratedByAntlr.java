@@ -3,16 +3,21 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import PL0Compiler.PL0VisitorTest;
 import org.tjdx.MidCode;
+import org.tjdx.PL0Compiler.PL0ErrorListener;
 
 import java.io.IOException;
 
 public class TestRecognizerGeneratedByAntlr {
     public static void main(String[] args) throws IOException {
-        CharStream input = CharStreams.fromFileName("D:\\2023 Fall\\CompileFundamention\\PL0-Compiler\\src\\main\\resources\\test01");
+        CharStream input = CharStreams.fromFileName("E:\\program\\PL0-Compiler\\src\\main\\resources\\test01");
         PL0Compiler.PL0Lexer lexer = new PL0Compiler.PL0Lexer(input);
 
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         PL0Compiler.PL0Parser parser = new PL0Compiler.PL0Parser(tokens);
+
+        PL0ErrorListener errorListener = new PL0ErrorListener();
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
 
         PL0Compiler.PL0Parser.ProgramContext root = parser.program();
         PL0VisitorTest visitor = new PL0VisitorTest();

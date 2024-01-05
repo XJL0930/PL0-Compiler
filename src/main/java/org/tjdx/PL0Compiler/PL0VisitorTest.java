@@ -1,11 +1,15 @@
 package PL0Compiler;
 
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.tjdx.MidCode;
 import org.tjdx.MidCodeSet;
 import org.tjdx.PL0Compiler.StatuteType;
 import org.tjdx.Symbol;
 import org.tjdx.TokenType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 import static java.lang.Math.abs;
@@ -15,11 +19,13 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
     private Stack<Symbol> symbols; //建立一个符号栈，方便对表达式进行规约
     public MidCodeSet midCodeSet; //中间代码集
     private Stack<StatuteType> statuteTypes;// 规约类型栈
+    private List<String> names;  // 已定义的变量名、常量名
     public PL0VisitorTest(){
         this.number=0;
         symbols=new Stack<>();
         midCodeSet=new MidCodeSet();
         statuteTypes =new Stack<>();
+        names =new ArrayList<>();
     }
     /**
      * 计算语句规约，1表示乘除，0表示加减
@@ -261,10 +267,10 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
         String S="T"+Integer.toString(number++);
         Symbol s_S=new Symbol(depth,S);
-        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
-        System.out.println(s_E.getFlaseList());
+//        System.out.println(s_E.getFlaseList()+s_S1.getNextList());
+//        System.out.println(s_E.getFlaseList());
         s_S.setNextList(merge(s_E.getFlaseList(),s_S1.getNextList()));
-        System.out.println(s_S.getNextList());
+//        System.out.println(s_S.getNextList());
         backpatch(s_S.getNextList(),nextquad());
         symbols.push(s_S);
     }
@@ -300,10 +306,10 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
      */
     private void statutePick(){
         for(Symbol t:symbols){
-            System.out.println(t.getSymbol()+" "+t.getLayer());
+//            System.out.println(t.getSymbol()+" "+t.getLayer());
         }
-        System.out.println(statuteTypes.peek().getType());
-        System.out.println("---------------------");
+//        System.out.println(statuteTypes.peek().getType());
+//        System.out.println("---------------------");
         StatuteType statuteType=statuteTypes.pop();
         int depth=statuteType.getDepth();
         switch (statuteType.getType()){
@@ -338,65 +344,64 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
     }
     @Override
     public Void visitProgram(PL0Compiler.PL0Parser.ProgramContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Program");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitProgramHeader(PL0Compiler.PL0Parser.ProgramHeaderContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Program Header");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitSubProgram(PL0Compiler.PL0Parser.SubProgramContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("SubProgram");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitConstantDeclaration(PL0Compiler.PL0Parser.ConstantDeclarationContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Constant Declaration");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitConstantDefinition(PL0Compiler.PL0Parser.ConstantDefinitionContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Constant Definition");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitVariableDeclaration(PL0Compiler.PL0Parser.VariableDeclarationContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Variable Declaration");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitIdentifier(PL0Compiler.PL0Parser.IdentifierContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Identifier" + " : " + ctx.getText()+" Layer:"+ctx.depth());
         symbols.push(new Symbol(ctx.depth(),ctx.getText()));
+        int parentType = ctx.getParent().getRuleIndex();
+        String name = ctx.getText();
+        if (parentType == 4 || parentType == 5) {
+            names.add(name);
+        } else if (parentType != 1) {
+            if (!names.contains(name)) {
+                // 获取词法单元的开始位置信息
+                Token startToken = ctx.getStart();
+                int line = startToken.getLine();
+                int charPositionInLine = startToken.getCharPositionInLine();
+                charPositionInLine += name.length();
+                System.err.println("line "+line+":"+charPositionInLine+" "+"\""+name+"\""+"not defined");
+                throw new ParseCancellationException("Syntax error detected.");
+            }
+        }
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitUnsignedInt(PL0Compiler.PL0Parser.UnsignedIntContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("UnsignedInt" + " : " + ctx.getText()+" Layer:"+ctx.depth());
         symbols.push(new Symbol(ctx.depth(),ctx.getText()));
         visitChildren(ctx);
         return null;
@@ -404,16 +409,12 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitStatement(PL0Compiler.PL0Parser.StatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Statement "+ctx.depth());
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitAssignmentStatement(PL0Compiler.PL0Parser.AssignmentStatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Assignment Statement");
         statuteTypes.push(new StatuteType(":=",ctx.depth()));
         visitChildren(ctx);
         statutePick();
@@ -422,8 +423,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitIfStatement(PL0Compiler.PL0Parser.IfStatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("If Statement");
         statuteTypes.push(new StatuteType("IF",ctx.depth()));
 
         visitChildren(ctx);
@@ -434,8 +433,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitWhileStatement(PL0Compiler.PL0Parser.WhileStatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("While Statement");
         statuteTypes.push(new StatuteType("WHILE",ctx.depth()));
         Symbol m1=new Symbol(ctx.depth(),"M"+number++);
         m1.setQuad(nextquad());
@@ -450,25 +447,18 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitCompoundStatement(PL0Compiler.PL0Parser.CompoundStatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Compound Statement");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitEmptyStatement(PL0Compiler.PL0Parser.EmptyStatementContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Empty Statement");
         visitChildren(ctx);
         return null;
     }
 
     @Override
     public Void visitExpression(PL0Compiler.PL0Parser.ExpressionContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Expression - ");
-
         visitChildren(ctx);
         statutePick();
         return null;
@@ -476,8 +466,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitTerm(PL0Compiler.PL0Parser.TermContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Term");
         visitChildren(ctx);
         statutePick();
         return null;
@@ -485,8 +473,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitFactor(PL0Compiler.PL0Parser.FactorContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Factor");
         visitChildren(ctx);
         statutePick();
         return null;
@@ -494,8 +480,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitCondition(PL0Compiler.PL0Parser.ConditionContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Condition");
         visitChildren(ctx);
 
         statutePick();
@@ -514,8 +498,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitAdditionOperator(PL0Compiler.PL0Parser.AdditionOperatorContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Addition Operator" + " : " + ctx.getText()+" Layer:"+ctx.depth());
         statuteTypes.push(new StatuteType(ctx.getText(), ctx.depth()));
         visitChildren(ctx);
         return null;
@@ -523,8 +505,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitMultiplicationOperator(PL0Compiler.PL0Parser.MultiplicationOperatorContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Multiplication Operator" + " : " + ctx.getText()+" Layer:"+ctx.depth());
         statuteTypes.push(new StatuteType(ctx.getText(), ctx.depth()));
         visitChildren(ctx);
         return null;
@@ -532,8 +512,6 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitRelationOperator(PL0Compiler.PL0Parser.RelationOperatorContext ctx) {
-        System.out.print("-".repeat(ctx.depth()*2-2));
-        System.out.println("Relation Operator" + " : " + ctx.getText());
         symbols.push(new Symbol(ctx.depth(),ctx.getText()));
         visitChildren(ctx);
         return null;
