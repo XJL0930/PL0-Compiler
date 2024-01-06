@@ -359,6 +359,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
                 System.err.println("line "+line+":"+charPositionInLine+" "+"\""+name+"\""+" already defined");
                 throw new ParseCancellationException("Syntax error detected.");
             }
+            String identifierType = "variable";
+            if (parentType == 4) identifierType = "constant";
+            System.out.println(name + ":" + identifierType);
             names.add(name);
         } else if (parentType != 1) {
             // 使用变量/常量
