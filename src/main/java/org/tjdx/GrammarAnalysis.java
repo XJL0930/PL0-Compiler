@@ -119,6 +119,7 @@ public class GrammarAnalysis {
             }
             else{
                 this.symbolMap.put(token.getTokenValue(), 1);
+                symbols.push(new Symbol(0,token.getTokenValue()));
                 readToken();
             }
         }
@@ -126,17 +127,20 @@ public class GrammarAnalysis {
             throw new GrammarException(1, token.getLineNum(),token.getColumnNum());
         }
         if(token.getTokenType()==TokenType.ASSIGN){
+            symbols.push(new Symbol(0,":="));
             readToken();
         }
         else{
             throw new GrammarException(4, token.getLineNum(),token.getColumnNum());
         }
         if(token.getTokenType()==TokenType.INT){
+            symbols.push(new Symbol(0,token.getTokenValue()));
             readToken();
         }
         else{
             throw new GrammarException(5, token.getLineNum(),token.getColumnNum());
         }
+        StatuteAssign(0);
     }
     /**
      * [<变量说明>]--→<变量说明>|ε
@@ -586,7 +590,6 @@ public class GrammarAnalysis {
             }
         }
     }
-
     /**
      * 对布尔表达式进行规约和中间代码生成
      * @param layer
@@ -613,7 +616,6 @@ public class GrammarAnalysis {
         mc4.setOp("j");
         midCodeSet.add(mc4);
     }
-
     /**
      * 对条件语句进行规约和中间代码生成
      * @param layer
@@ -675,7 +677,6 @@ public class GrammarAnalysis {
         midCodeSet.add(midCode);
         backpatch(s_S.getNextList(),nextquad());
     }
-
     /**
      * 对赋值语句进行规约和中间代码生成
      * @param layer
@@ -688,7 +689,6 @@ public class GrammarAnalysis {
         midCodeSet.add(midCode);
         symbols.push(new Symbol(layer,"T"+Integer.toString(number++)));
     }
-
     /**
      * 对数值取相反数表达式进行处理
      * @param layer
@@ -704,7 +704,6 @@ public class GrammarAnalysis {
         midCodeSet.add(midCode);
         symbols.push(new Symbol(layer,temp));
     }
-
     /**
      * 对括号表达式进行处理
      * @param layer
@@ -729,15 +728,6 @@ public class GrammarAnalysis {
         symbols.push(new Symbol(layer,temp));
     }
     /**
-     * 用于布尔语句翻译的生成链表
-     * @param n
-     */
-    private int makeList(int n){
-        midCodeSet.getAllcode().get(n).setDes("-");
-        return n;
-    }
-
-    /**
      * 用于布尔语句翻译的生成合并
      */
     private int merge(int n1,int n2){
@@ -751,7 +741,6 @@ public class GrammarAnalysis {
             m.setDes(Integer.toString(n2));
         return n1;
     }
-
     /**
      * 返回下一条将要生成的三地址代码地址
      * @return
@@ -759,7 +748,6 @@ public class GrammarAnalysis {
     private int nextquad(){
         return midCodeSet.getAddress()+1;
     }
-
     /**
      * 回填函数，将以p为表头的链表都回填为t
      * @param p
@@ -777,7 +765,6 @@ public class GrammarAnalysis {
             }
         }
     }
-
     /**
      * 得到比较运算符的符号
      * @param t

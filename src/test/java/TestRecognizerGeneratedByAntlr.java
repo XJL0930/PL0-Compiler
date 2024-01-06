@@ -9,7 +9,7 @@ import java.io.IOException;
 
 public class TestRecognizerGeneratedByAntlr {
     public static void main(String[] args) throws IOException {
-        CharStream input = CharStreams.fromFileName("E:\\program\\PL0-Compiler\\src\\main\\resources\\test04");
+        CharStream input = CharStreams.fromFileName("D:\\2023 Fall\\CompileFundamention\\PL0-Compiler\\src\\main\\resources\\test01");
         PL0Compiler.PL0Lexer lexer = new PL0Compiler.PL0Lexer(input);
 
         CommonTokenStream tokens = new CommonTokenStream(lexer);

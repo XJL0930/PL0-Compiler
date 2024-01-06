@@ -328,7 +328,9 @@ public class PL0VisitorTest extends PL0Compiler.PL0BaseVisitor<Void> {
 
     @Override
     public Void visitConstantDefinition(PL0Compiler.PL0Parser.ConstantDefinitionContext ctx) {
+        statuteTypes.push(new StatuteType(":=",ctx.depth()));
         visitChildren(ctx);
+        statutePick();
         return null;
     }
 
